@@ -23,29 +23,19 @@ func Pick(items []string, currentProfile string) (string, error) {
 }
 
 func pickWithFzf(items []string, currentProfile string) (string, error) {
-	// Mark the current profile so the user can see it at a glance.
+	// Color the current profile green, matching kubectx's style.
+	// fzf strips ANSI codes from output, so the returned string is plain.
 	lines := make([]string, len(items))
 	for i, item := range items {
 		if item == currentProfile {
-			lines[i] = item + " ✓"
+			lines[i] = "\033[32m" + item + "\033[0m"
 		} else {
 			lines[i] = item
 		}
 	}
 
-	header := "Select AWS profile"
-	if currentProfile != "" {
-		header = "current: " + currentProfile
-	}
-
 	var stdout bytes.Buffer
-	cmd := exec.Command("fzf",
-		"--height=40%",
-		"--layout=reverse",
-		"--header="+header,
-		"--prompt=AWS Profile> ",
-		"--pointer=▶",
-	)
+	cmd := exec.Command("fzf", "--ansi", "--no-preview")
 	cmd.Stdin = strings.NewReader(strings.Join(lines, "\n"))
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
@@ -57,7 +47,7 @@ func pickWithFzf(items []string, currentProfile string) (string, error) {
 		return "", fmt.Errorf("fzf: %w", err)
 	}
 
-	selected := strings.TrimSuffix(strings.TrimSpace(stdout.String()), " ✓")
+	selected := strings.TrimSpace(stdout.String())
 	if selected == "" {
 		return "", fmt.Errorf("no profile selected")
 	}
