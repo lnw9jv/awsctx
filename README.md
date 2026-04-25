@@ -1,6 +1,6 @@
 # awsctx
 
-Switch AWS profiles like [kubectx](https://github.com/ahmetb/kubectx) — fast, fuzzy, no dependencies.
+Switch AWS profiles inspired by [kubectx](https://github.com/ahmetb/kubectx) — fast, fuzzy, minimal dependencies.
 
 ```
 awsctx          # interactive picker
@@ -41,7 +41,7 @@ awsctx shell-init fish | source
 
 | Command | Description |
 |---|---|
-| `awsctx` | Open interactive fuzzy picker |
+| `awsctx` | Open interactive fuzzy picker (uses fzf if installed, built-in TUI otherwise) |
 | `awsctx <profile>` | Switch to named profile |
 | `awsctx -` | Switch to previous profile |
 | `awsctx -c` | Print current profile |
@@ -71,3 +71,4 @@ awsctx completion fish > ~/.config/fish/completions/awsctx.fish
 
 - Go 1.22+ (to build)
 - `~/.aws/config` with `[profile <name>]` sections
+- [`fzf`](https://github.com/junegunn/fzf) (optional, recommended — `brew install fzf`)
