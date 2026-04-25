@@ -34,6 +34,10 @@ func init() {
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		return profiles, cobra.ShellCompDirectiveNoFileComp
+		completions := []string{"-\tSwitch to previous profile"}
+		for _, p := range profiles {
+			completions = append(completions, p+"\tAWS Profile")
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
 	}
 }

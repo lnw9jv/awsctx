@@ -1,20 +1,71 @@
 package picker
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"golang.org/x/term"
 )
 
-// Pick opens an interactive list picker and returns the selected item.
-// currentProfile is marked with a checkmark in the list.
+// Pick tries fzf first; falls back to the built-in TUI if fzf is not installed.
 func Pick(items []string, currentProfile string) (string, error) {
 	if len(items) == 0 {
 		return "", fmt.Errorf("no AWS profiles found")
 	}
+	if _, err := exec.LookPath("fzf"); err == nil {
+		return pickWithFzf(items, currentProfile)
+	}
+	fmt.Fprintln(os.Stderr, "tip: install fzf for a better picker (brew install fzf)")
+	return pickLegacy(items, currentProfile)
+}
 
+func pickWithFzf(items []string, currentProfile string) (string, error) {
+	// Mark the current profile so the user can see it at a glance.
+	lines := make([]string, len(items))
+	for i, item := range items {
+		if item == currentProfile {
+			lines[i] = item + " ✓"
+		} else {
+			lines[i] = item
+		}
+	}
+
+	header := "Select AWS profile"
+	if currentProfile != "" {
+		header = "current: " + currentProfile
+	}
+
+	var stdout bytes.Buffer
+	cmd := exec.Command("fzf",
+		"--height=40%",
+		"--layout=reverse",
+		"--header="+header,
+		"--prompt=AWS Profile> ",
+		"--pointer=▶",
+	)
+	cmd.Stdin = strings.NewReader(strings.Join(lines, "\n"))
+	cmd.Stdout = &stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 130 {
+			return "", fmt.Errorf("cancelled")
+		}
+		return "", fmt.Errorf("fzf: %w", err)
+	}
+
+	selected := strings.TrimSuffix(strings.TrimSpace(stdout.String()), " ✓")
+	if selected == "" {
+		return "", fmt.Errorf("no profile selected")
+	}
+	return selected, nil
+}
+
+// pickLegacy is the original from-scratch TUI used when fzf is not available.
+func pickLegacy(items []string, currentProfile string) (string, error) {
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
 		return "", fmt.Errorf("cannot open terminal: %w", err)
@@ -92,7 +143,6 @@ func filter(items []string, query string) []string {
 }
 
 func render(tty *os.File, query string, filtered []string, cursor int, current string) {
-	// clear previous render: move up and clear lines
 	fmt.Fprintf(tty, "\r\033[K> %s\r\n", query)
 	for i, p := range filtered {
 		label := p
@@ -105,16 +155,8 @@ func render(tty *os.File, query string, filtered []string, cursor int, current s
 			fmt.Fprintf(tty, "\r\033[K  %s\r\n", label)
 		}
 	}
-	// move cursor back up to input line
 	lines := len(filtered) + 1
 	fmt.Fprintf(tty, "\033[%dA", lines)
-	// position cursor after prompt
 	fmt.Fprintf(tty, "\r\033[%dC", len(query)+2)
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
