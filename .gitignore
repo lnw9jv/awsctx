@@ -1,0 +1,5 @@
+awsctx
+awsctx-bin
+
+# AI assistant artifacts
+context-snapshot.json
