@@ -13,6 +13,7 @@ import (
 var (
 	unsetFlag   bool
 	currentFlag bool
+	regionFlag  string
 )
 
 var rootCmd = &cobra.Command{
@@ -23,6 +24,10 @@ var rootCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if unsetFlag {
 			fmt.Println("unset AWS_PROFILE")
+			fmt.Println("unset AWS_DEFAULT_REGION")
+			if regionFlag != "" {
+				fmt.Printf("export AWS_DEFAULT_REGION=%s\n", regionFlag)
+			}
 			return nil
 		}
 		if currentFlag {
@@ -43,10 +48,23 @@ var rootCmd = &cobra.Command{
 				_ = st.SetPrevious(current)
 			}
 			fmt.Printf("export AWS_PROFILE=%s\n", prev)
+			if regionFlag != "" {
+				fmt.Printf("export AWS_DEFAULT_REGION=%s\n", regionFlag)
+			}
+			return nil
+		}
+		if len(args) == 0 && regionFlag != "" {
+			fmt.Printf("export AWS_DEFAULT_REGION=%s\n", regionFlag)
 			return nil
 		}
 		if len(args) == 1 {
-			return switchProfile(args[0])
+			if err := switchProfile(args[0]); err != nil {
+				return err
+			}
+			if regionFlag != "" {
+				fmt.Printf("export AWS_DEFAULT_REGION=%s\n", regionFlag)
+			}
+			return nil
 		}
 		profiles, err := awscfg.LoadProfiles(awscfg.ConfigPath())
 		if err != nil {
@@ -56,7 +74,13 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return switchProfile(selected)
+		if err := switchProfile(selected); err != nil {
+			return err
+		}
+		if regionFlag != "" {
+			fmt.Printf("export AWS_DEFAULT_REGION=%s\n", regionFlag)
+		}
+		return nil
 	},
 }
 
@@ -68,6 +92,7 @@ func Execute(version string) {
 }
 
 func init() {
-	rootCmd.Flags().BoolVarP(&unsetFlag, "unset", "u", false, "Unset AWS_PROFILE")
+	rootCmd.Flags().BoolVarP(&unsetFlag, "unset", "u", false, "Unset AWS_PROFILE and AWS_DEFAULT_REGION")
 	rootCmd.Flags().BoolVarP(&currentFlag, "current", "c", false, "Print current AWS profile")
+	rootCmd.Flags().StringVarP(&regionFlag, "region", "r", "", "Set AWS_DEFAULT_REGION")
 }

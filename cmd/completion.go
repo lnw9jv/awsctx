@@ -23,6 +23,38 @@ var completionCmd = &cobra.Command{
 	},
 }
 
+var awsRegions = []string{
+	"af-south-1\tAfrica (Cape Town)",
+	"ap-east-1\tAsia Pacific (Hong Kong)",
+	"ap-northeast-1\tAsia Pacific (Tokyo)",
+	"ap-northeast-2\tAsia Pacific (Seoul)",
+	"ap-northeast-3\tAsia Pacific (Osaka)",
+	"ap-south-1\tAsia Pacific (Mumbai)",
+	"ap-south-2\tAsia Pacific (Hyderabad)",
+	"ap-southeast-1\tAsia Pacific (Singapore)",
+	"ap-southeast-2\tAsia Pacific (Sydney)",
+	"ap-southeast-3\tAsia Pacific (Jakarta)",
+	"ap-southeast-4\tAsia Pacific (Melbourne)",
+	"ca-central-1\tCanada (Central)",
+	"ca-west-1\tCanada (Calgary)",
+	"eu-central-1\tEurope (Frankfurt)",
+	"eu-central-2\tEurope (Zurich)",
+	"eu-north-1\tEurope (Stockholm)",
+	"eu-south-1\tEurope (Milan)",
+	"eu-south-2\tEurope (Spain)",
+	"eu-west-1\tEurope (Ireland)",
+	"eu-west-2\tEurope (London)",
+	"eu-west-3\tEurope (Paris)",
+	"il-central-1\tIsrael (Tel Aviv)",
+	"me-central-1\tMiddle East (UAE)",
+	"me-south-1\tMiddle East (Bahrain)",
+	"sa-east-1\tSouth America (São Paulo)",
+	"us-east-1\tUS East (N. Virginia)",
+	"us-east-2\tUS East (Ohio)",
+	"us-west-1\tUS West (N. California)",
+	"us-west-2\tUS West (Oregon)",
+}
+
 func init() {
 	rootCmd.AddCommand(completionCmd)
 
@@ -40,4 +72,8 @@ func init() {
 		}
 		return completions, cobra.ShellCompDirectiveNoFileComp
 	}
+
+	_ = rootCmd.RegisterFlagCompletionFunc("region", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return awsRegions, cobra.ShellCompDirectiveNoFileComp
+	})
 }
