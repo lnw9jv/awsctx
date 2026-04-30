@@ -86,8 +86,44 @@ func TestUnset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unset failed: %v", err)
 	}
-	if got := strings.TrimSpace(string(out)); got != "unset AWS_PROFILE" {
-		t.Errorf("expected 'unset AWS_PROFILE', got %q", got)
+	got := strings.TrimSpace(string(out))
+	want := "unset AWS_PROFILE\nunset AWS_DEFAULT_REGION"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+func TestRegionFlag(t *testing.T) {
+	bin := buildBinary(t)
+	cmd := exec.Command(bin, "-r", "us-east-1")
+	cmd.Env = os.Environ()
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("region flag failed: %v", err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "export AWS_DEFAULT_REGION=us-east-1" {
+		t.Errorf("expected 'export AWS_DEFAULT_REGION=us-east-1', got %q", got)
+	}
+}
+
+func TestRegionFlagWithProfile(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[default]\n[profile dev]\n")
+	stateDir := t.TempDir()
+
+	cmd := exec.Command(bin, "dev", "-r", "ap-southeast-1")
+	cmd.Env = append(os.Environ(),
+		"AWS_CONFIG_FILE="+cfg,
+		"AWSCTX_STATE_DIR="+stateDir,
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("region+profile failed: %v", err)
+	}
+	got := strings.TrimSpace(string(out))
+	want := "export AWS_PROFILE=dev\nexport AWS_DEFAULT_REGION=ap-southeast-1"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
 	}
 }
 

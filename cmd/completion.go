@@ -23,7 +23,7 @@ var completionCmd = &cobra.Command{
 	},
 }
 
-var awsRegions = []string{
+var AWSRegions = []string{
 	"af-south-1\tAfrica (Cape Town)",
 	"ap-east-1\tAsia Pacific (Hong Kong)",
 	"ap-northeast-1\tAsia Pacific (Tokyo)",
@@ -73,7 +73,4 @@ func init() {
 		return completions, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	_ = rootCmd.RegisterFlagCompletionFunc("region", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return awsRegions, cobra.ShellCompDirectiveNoFileComp
-	})
 }

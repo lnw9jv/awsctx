@@ -95,4 +95,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&unsetFlag, "unset", "u", false, "Unset AWS_PROFILE and AWS_DEFAULT_REGION")
 	rootCmd.Flags().BoolVarP(&currentFlag, "current", "c", false, "Print current AWS profile")
 	rootCmd.Flags().StringVarP(&regionFlag, "region", "r", "", "Set AWS_DEFAULT_REGION")
+	_ = rootCmd.RegisterFlagCompletionFunc("region", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return AWSRegions, cobra.ShellCompDirectiveNoFileComp
+	})
 }
