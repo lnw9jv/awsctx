@@ -3,11 +3,13 @@
 Switch AWS profiles inspired by [kubectx](https://github.com/ahmetb/kubectx) — fast, fuzzy, minimal dependencies.
 
 ```
-awsctx          # interactive picker
-awsctx dev      # switch to profile "dev"
-awsctx -        # switch to previous profile
-awsctx -c       # show current profile
-awsctx -u       # unset AWS_PROFILE
+awsctx                        # interactive picker
+awsctx dev                    # switch to profile "dev"
+awsctx -                      # switch to previous profile
+awsctx -c                     # show current profile
+awsctx -u                     # unset AWS_PROFILE and AWS_DEFAULT_REGION
+awsctx -r us-east-1           # set AWS_DEFAULT_REGION
+awsctx dev -r ap-southeast-1  # switch profile and set region
 ```
 
 ## Install
@@ -45,7 +47,9 @@ awsctx shell-init fish | source
 | `awsctx <profile>` | Switch to named profile |
 | `awsctx -` | Switch to previous profile |
 | `awsctx -c` | Print current profile |
-| `awsctx -u` | Unset `AWS_PROFILE` |
+| `awsctx -u` | Unset `AWS_PROFILE` and `AWS_DEFAULT_REGION` |
+| `awsctx -r <region>` | Set `AWS_DEFAULT_REGION` (tab-completes all AWS regions) |
+| `awsctx <profile> -r <region>` | Switch profile and set region in one command |
 | `awsctx shell-init zsh\|bash\|fish` | Print shell integration snippet |
 | `awsctx completion zsh\|bash\|fish` | Print completion script |
 | `awsctx --version` | Print version |
