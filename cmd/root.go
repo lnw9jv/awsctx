@@ -14,6 +14,7 @@ var (
 	unsetFlag   bool
 	currentFlag bool
 	regionFlag  string
+	profileFlag string
 )
 
 var rootCmd = &cobra.Command{
@@ -38,7 +39,11 @@ var rootCmd = &cobra.Command{
 			fmt.Println(profile)
 			return nil
 		}
-		if len(args) == 1 && args[0] == "-" {
+		target := profileFlag
+		if len(args) == 1 {
+			target = args[0]
+		}
+		if target == "-" {
 			st := state.New(state.DefaultDir())
 			prev, err := st.GetPrevious()
 			if err != nil {
@@ -53,12 +58,12 @@ var rootCmd = &cobra.Command{
 			}
 			return nil
 		}
-		if len(args) == 0 && regionFlag != "" {
+		if target == "" && regionFlag != "" {
 			fmt.Printf("export AWS_DEFAULT_REGION=%s\n", regionFlag)
 			return nil
 		}
-		if len(args) == 1 {
-			if err := switchProfile(args[0]); err != nil {
+		if target != "" {
+			if err := switchProfile(target); err != nil {
 				return err
 			}
 			if regionFlag != "" {
@@ -95,6 +100,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&unsetFlag, "unset", "u", false, "Unset AWS_PROFILE and AWS_DEFAULT_REGION")
 	rootCmd.Flags().BoolVarP(&currentFlag, "current", "c", false, "Print current AWS profile")
 	rootCmd.Flags().StringVarP(&regionFlag, "region", "r", "", "Set AWS_DEFAULT_REGION")
+	rootCmd.Flags().StringVarP(&profileFlag, "profile", "p", "", "AWS profile to switch to")
 	_ = rootCmd.RegisterFlagCompletionFunc("region", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return AWSRegions, cobra.ShellCompDirectiveNoFileComp
 	})

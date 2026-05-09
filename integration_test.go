@@ -127,6 +127,91 @@ func TestRegionFlagWithProfile(t *testing.T) {
 	}
 }
 
+func TestProfileFlag(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[default]\n[profile dev]\n[profile prod]\n")
+	stateDir := t.TempDir()
+
+	cmd := exec.Command(bin, "--profile", "dev")
+	cmd.Env = append(os.Environ(),
+		"AWS_CONFIG_FILE="+cfg,
+		"AWSCTX_STATE_DIR="+stateDir,
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("--profile flag failed: %v", err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "export AWS_PROFILE=dev" {
+		t.Errorf("expected 'export AWS_PROFILE=dev', got %q", got)
+	}
+}
+
+func TestProfileShortFlag(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[default]\n[profile dev]\n[profile prod]\n")
+	stateDir := t.TempDir()
+
+	cmd := exec.Command(bin, "-p", "prod")
+	cmd.Env = append(os.Environ(),
+		"AWS_CONFIG_FILE="+cfg,
+		"AWSCTX_STATE_DIR="+stateDir,
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("-p flag failed: %v", err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "export AWS_PROFILE=prod" {
+		t.Errorf("expected 'export AWS_PROFILE=prod', got %q", got)
+	}
+}
+
+func TestProfileFlagWithRegion(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[default]\n[profile dev]\n")
+	stateDir := t.TempDir()
+
+	cmd := exec.Command(bin, "--profile", "dev", "-r", "ap-southeast-1")
+	cmd.Env = append(os.Environ(),
+		"AWS_CONFIG_FILE="+cfg,
+		"AWSCTX_STATE_DIR="+stateDir,
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("--profile + -r failed: %v", err)
+	}
+	got := strings.TrimSpace(string(out))
+	want := "export AWS_PROFILE=dev\nexport AWS_DEFAULT_REGION=ap-southeast-1"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+func TestProfileFlagPrevious(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[profile dev]\n[profile prod]\n")
+	stateDir := t.TempDir()
+
+	run := func(profile string, args ...string) string {
+		cmd := exec.Command(bin, args...)
+		cmd.Env = append(os.Environ(),
+			"AWS_CONFIG_FILE="+cfg,
+			"AWSCTX_STATE_DIR="+stateDir,
+			"AWS_PROFILE="+profile,
+		)
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("cmd %v failed: %v", args, err)
+		}
+		return strings.TrimSpace(string(out))
+	}
+
+	run("dev", "prod")
+	got := run("prod", "--profile", "-")
+	if got != "export AWS_PROFILE=dev" {
+		t.Errorf("expected 'export AWS_PROFILE=dev', got %q", got)
+	}
+}
+
 func TestCurrent(t *testing.T) {
 	bin := buildBinary(t)
 	cmd := exec.Command(bin, "-c")

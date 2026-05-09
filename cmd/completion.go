@@ -66,9 +66,10 @@ func init() {
 	rootCmd.AddCommand(completionCmd)
 
 	rootCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) != 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	_ = rootCmd.RegisterFlagCompletionFunc("profile", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		profiles, err := awscfg.LoadProfiles(awscfg.ConfigPath())
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
@@ -78,6 +79,6 @@ func init() {
 			completions = append(completions, p+"\tAWS Profile")
 		}
 		return completions, cobra.ShellCompDirectiveNoFileComp
-	}
+	})
 
 }
