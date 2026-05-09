@@ -6,17 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 make build            # build binary (injects version via ldflags)
-make test             # run unit tests (go test ./...)
-make test-integration # run unit + integration tests (-tags integration)
+make test             # go test ./...
+make test-integration # go test -tags integration ./...
 make install          # build and copy to /usr/local/bin
 
 # Run a single test
 go test ./internal/aws/ -run TestLoadProfiles
 go test ./internal/state/ -run TestGetPrevious
+go test ./cmd/ -run TestRegion
 
 # Run integration tests directly
 go test -tags integration ./...
 ```
+
+There is no lint target; run `go vet ./...` manually.
 
 ## Architecture
 
@@ -32,11 +35,18 @@ go test -tags integration ./...
 
 - **`internal/picker/`** — `Pick()` tries fzf first (via `exec.LookPath`); falls back to the built-in TUI with a stderr tip. The built-in opens `/dev/tty` directly, puts the terminal in raw mode, and renders a fuzzy-filtered list with arrow-key navigation using ANSI escape codes and `golang.org/x/term`. fzf exit code 130 is treated as user-cancelled.
 
+### stdout/stderr contract
+
+**Critical invariant**: only `export KEY=VALUE` and `unset KEY` lines go to stdout — the shell wrapper `eval`s everything on stdout verbatim. Errors and informational output must go to stderr (Cobra handles this for returned errors). Adding any non-export `fmt.Println` to a code path that the shell wrapper invokes silently corrupts the shell environment.
+
 ### Flag interactions
 
+- `-p <profile>` and a positional arg are interchangeable; `-p` is preferred when tab-completion is needed because Cobra wires profile completion to the flag.
+- `-c` reads `$AWS_PROFILE` from the environment and prints it; it does not touch state and writes to stdout (no `export` prefix — not `eval`'d by the wrapper).
 - `-r <region>` can be used standalone (no profile arg) to set only `AWS_DEFAULT_REGION` without switching the profile.
 - `-u` unsets both `AWS_PROFILE` and `AWS_DEFAULT_REGION`; combining with `-r` re-exports the region after unsetting.
 - All code paths that switch or print a profile also check `regionFlag` at the end and emit `export AWS_DEFAULT_REGION=<region>` if set.
+- `switchProfile()` validates the profile exists in `~/.aws/config` before emitting the export; an unknown profile returns an error (goes to stderr via Cobra).
 
 ### Version injection
 
@@ -45,3 +55,11 @@ The version string is set at build time via `-ldflags "-X main.version=$(VERSION
 ### Integration tests
 
 Integration tests live in `integration_test.go` at the root and use the `//go:build integration` tag. They are excluded from the default `go test ./...` run and require `-tags integration`.
+
+## Task Execution Rules
+
+- Complete ALL tasks in the todo list before stopping
+- Do NOT pause for confirmation unless you hit a destructive/irreversible action
+- If stuck on a step, skip it, log the blocker, and continue to the next task
+- Do NOT summarize progress mid-task — only summarize when the ENTIRE list is done
+- Never ask "Should I continue?" — always continue unless explicitly blocked
