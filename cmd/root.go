@@ -104,4 +104,15 @@ func init() {
 	_ = rootCmd.RegisterFlagCompletionFunc("region", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return AWSRegions, cobra.ShellCompDirectiveNoFileComp
 	})
+	_ = rootCmd.RegisterFlagCompletionFunc("profile", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		profiles, err := awscfg.LoadProfiles(awscfg.ConfigPath())
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		completions := []string{"-\tSwitch to previous profile"}
+		for _, p := range profiles {
+			completions = append(completions, p+"\tAWS Profile")
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	})
 }

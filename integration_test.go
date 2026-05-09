@@ -212,6 +212,43 @@ func TestProfileFlagPrevious(t *testing.T) {
 	}
 }
 
+func TestProfileFlagCompletion(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[default]\n[profile dev]\n[profile prod]\n")
+
+	for _, flag := range []string{"--profile", "-p"} {
+		t.Run(flag, func(t *testing.T) {
+			cmd := exec.Command(bin, "__complete", flag, "")
+			cmd.Env = append(os.Environ(), "AWS_CONFIG_FILE="+cfg)
+			out, err := cmd.Output()
+			if err != nil {
+				t.Fatalf("completion for %s failed: %v", flag, err)
+			}
+			got := string(out)
+			for _, want := range []string{"dev", "prod", "-"} {
+				if !strings.Contains(got, want) {
+					t.Errorf("completion for %s: expected %q in output, got:\n%s", flag, want, got)
+				}
+			}
+		})
+	}
+}
+
+func TestPositionalArgNoCompletion(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[profile dev]\n[profile prod]\n")
+
+	cmd := exec.Command(bin, "__complete", "")
+	cmd.Env = append(os.Environ(), "AWS_CONFIG_FILE="+cfg)
+	out, _ := cmd.Output()
+	got := string(out)
+	for _, unwanted := range []string{"dev", "prod"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("positional completion should not list profiles, got %q in output:\n%s", unwanted, got)
+		}
+	}
+}
+
 func TestCurrent(t *testing.T) {
 	bin := buildBinary(t)
 	cmd := exec.Command(bin, "-c")
