@@ -80,6 +80,23 @@ func TestLoadProfileDetails(t *testing.T) {
 	}
 }
 
+func TestLoadProfileDetails_RoleARN(t *testing.T) {
+	f, _ := os.CreateTemp("", "aws-config-*")
+	f.WriteString("[profile prod]\nrole_arn = arn:aws:iam::123456789012:role/MyRole\nsource_profile = default\n")
+	f.Close()
+
+	profiles, err := aws.LoadProfileDetails(f.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(profiles) != 1 {
+		t.Fatalf("expected 1 profile, got %d", len(profiles))
+	}
+	if profiles[0].AccountID != "123456789012" {
+		t.Errorf("expected account ID from role_arn, got %q", profiles[0].AccountID)
+	}
+}
+
 func TestLoadProfileDetails_SSOPreferredOverAccountID(t *testing.T) {
 	f, _ := os.CreateTemp("", "aws-config-*")
 	f.WriteString("[profile dev]\nsso_account_id = 111111111111\naccount_id = 999999999999\n")

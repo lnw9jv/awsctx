@@ -53,6 +53,13 @@ func sectionAccountID(sec *ini.Section) string {
 			return v
 		}
 	}
+	// Fall back to extracting account ID from role_arn (arn:aws:iam::ACCOUNT:role/NAME).
+	if arn := sec.Key("role_arn").String(); arn != "" {
+		parts := strings.SplitN(arn, ":", 6)
+		if len(parts) >= 5 && parts[4] != "" {
+			return parts[4]
+		}
+	}
 	return ""
 }
 
