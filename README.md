@@ -11,6 +11,8 @@ awsctx -c                     # show current profile
 awsctx -u                     # unset AWS_PROFILE and AWS_DEFAULT_REGION
 awsctx -r us-east-1           # set AWS_DEFAULT_REGION
 awsctx -p dev -r ap-southeast-1  # switch profile and set region
+awsctx list                   # list all profiles with account IDs
+awsctx ls                     # same as list
 ```
 
 ## Install
@@ -52,6 +54,7 @@ awsctx shell-init fish | source
 | `awsctx -u` | Unset `AWS_PROFILE` and `AWS_DEFAULT_REGION` |
 | `awsctx -r <region>` | Set `AWS_DEFAULT_REGION` (tab-completes all AWS regions) |
 | `awsctx -p <profile> -r <region>` | Switch profile and set region in one command |
+| `awsctx list` / `awsctx ls` | List all profiles with account IDs |
 | `awsctx shell-init zsh\|bash\|fish` | Print shell integration snippet |
 | `awsctx completion zsh\|bash\|fish` | Print completion script |
 | `awsctx --version` | Print version |

@@ -249,6 +249,70 @@ func TestPositionalArgNoCompletion(t *testing.T) {
 	}
 }
 
+func TestList(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[default]\nsso_account_id = 111122223333\n\n[profile dev]\nsso_account_id = 444455556666\n\n[profile prod]\n")
+
+	cmd := exec.Command(bin, "list")
+	cmd.Env = append(os.Environ(),
+		"AWS_CONFIG_FILE="+cfg,
+		"AWS_PROFILE=dev",
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("list failed: %v", err)
+	}
+	got := string(out)
+	if !strings.Contains(got, "* dev") {
+		t.Errorf("current profile not marked with *, got:\n%s", got)
+	}
+	if !strings.Contains(got, "111122223333") {
+		t.Errorf("expected default account ID in output, got:\n%s", got)
+	}
+	if !strings.Contains(got, "444455556666") {
+		t.Errorf("expected dev account ID in output, got:\n%s", got)
+	}
+	if !strings.Contains(got, "-") {
+		t.Errorf("expected '-' for prod (no account ID), got:\n%s", got)
+	}
+}
+
+func TestListAlias(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[profile dev]\n[profile prod]\n")
+
+	cmd := exec.Command(bin, "ls")
+	cmd.Env = append(os.Environ(), "AWS_CONFIG_FILE="+cfg)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("ls alias failed: %v", err)
+	}
+	got := string(out)
+	for _, want := range []string{"dev", "prod"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("ls alias: expected %q in output, got:\n%s", want, got)
+		}
+	}
+}
+
+func TestListNoCurrentMark(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[profile dev]\n[profile prod]\n")
+
+	cmd := exec.Command(bin, "list")
+	cmd.Env = append(os.Environ(),
+		"AWS_CONFIG_FILE="+cfg,
+		"AWS_PROFILE=",
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("list failed: %v", err)
+	}
+	if strings.Contains(string(out), "*") {
+		t.Errorf("expected no '*' marker when no profile active, got:\n%s", out)
+	}
+}
+
 func TestCurrent(t *testing.T) {
 	bin := buildBinary(t)
 	cmd := exec.Command(bin, "-c")

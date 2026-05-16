@@ -27,9 +27,9 @@ There is no lint target; run `go vet ./...` manually.
 
 ### Package layout
 
-- **`cmd/`** — Cobra command definitions. `root.go` handles the main dispatch logic (flags, `-` for previous, interactive picker, or direct switch). `switch.go` contains `switchProfile()` as a helper function — it is **not** a subcommand. `shell_init.go` contains the POSIX and Fish shell wrapper snippets as string constants. `completion.go` delegates to Cobra's built-in completion.
+- **`cmd/`** — Cobra command definitions. `root.go` handles the main dispatch logic (flags, `-` for previous, interactive picker, or direct switch). `switch.go` contains `switchProfile()` as a helper function — it is **not** a subcommand. `list.go` is the `list`/`ls` subcommand (profiles + account IDs, no env mutation). `shell_init.go` contains the POSIX and Fish shell wrapper snippets as string constants. `completion.go` delegates to Cobra's built-in completion.
 
-- **`internal/aws/`** — Reads `~/.aws/config` (or `$AWS_CONFIG_FILE`) using `gopkg.in/ini.v1`. Special care is taken because `ini.v1` merges `[default]` into a synthetic root section (index 0), so `hasDefaultSection` does a raw line scan to detect it before iterating named sections. Profile names are extracted by stripping the `profile ` prefix from `[profile foo]` sections.
+- **`internal/aws/`** — Reads `~/.aws/config` (or `$AWS_CONFIG_FILE`) using `gopkg.in/ini.v1`. Exposes two functions: `LoadProfiles` (returns `[]string` names) and `LoadProfileDetails` (returns `[]Profile` with `Name` and `AccountID`). `AccountID` is populated from the `sso_account_id` or `account_id` ini key, whichever is present first. Special care is taken because `ini.v1` merges `[default]` into a synthetic root section (index 0), so `hasDefaultSection` does a raw line scan to detect it before iterating named sections. Profile names are extracted by stripping the `profile ` prefix from `[profile foo]` sections.
 
 - **`internal/state/`** — Manages the "previous profile" as a plain file at `~/.cache/awsctx/previous` (overridable via `AWSCTX_STATE_DIR`). Only two operations: `SetPrevious` and `GetPrevious`.
 

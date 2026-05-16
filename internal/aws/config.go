@@ -4,21 +4,32 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/ini.v1"
 )
 
+// Profile holds a profile name and its AWS account ID (empty when absent).
+type Profile struct {
+	Name      string
+	AccountID string
+}
+
 func ConfigPath() string {
 	if p := os.Getenv("AWS_CONFIG_FILE"); p != "" {
 		return p
 	}
-	home, _ := os.UserHomeDir()
-	return home + "/.aws/config"
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return ""
+	}
+	return filepath.Join(home, ".aws", "config")
 }
 
 // hasDefaultSection reports whether the config file contains an explicit [default] section.
-// ini.v1 merges [default] into its synthetic root section (index 0), so we detect it separately.
+// ini.v1 stores [default] as a named section "default" (not the synthetic root at index 0),
+// but does not include it in sections iterable via CutPrefix("profile "), so we detect it separately.
 func hasDefaultSection(configPath string) bool {
 	f, err := os.Open(configPath)
 	if err != nil {
@@ -32,12 +43,22 @@ func hasDefaultSection(configPath string) bool {
 			return true
 		}
 	}
+	_ = sc.Err() // scanner errors are treated as "not found"
 	return false
 }
 
-// LoadProfiles returns all profile names from the given config file path.
-// [default] → "default", [profile foo] → "foo".
-func LoadProfiles(configPath string) ([]string, error) {
+func sectionAccountID(sec *ini.Section) string {
+	for _, key := range []string{"sso_account_id", "account_id"} {
+		if v := sec.Key(key).String(); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// LoadProfileDetails returns all profiles from the given config file path, including account IDs.
+// [default] → Profile{Name:"default"}, [profile foo] → Profile{Name:"foo"}.
+func LoadProfileDetails(configPath string) ([]Profile, error) {
 	cfg, err := ini.LoadSources(ini.LoadOptions{
 		IgnoreInlineComment: true,
 	}, configPath)
@@ -45,9 +66,13 @@ func LoadProfiles(configPath string) ([]string, error) {
 		return nil, fmt.Errorf("cannot read AWS config %s: %w", configPath, err)
 	}
 
-	var profiles []string
+	var profiles []Profile
 	if hasDefaultSection(configPath) {
-		profiles = append(profiles, "default")
+		// ini.v1 stores [default] as a named section "default" (not the synthetic root).
+		profiles = append(profiles, Profile{
+			Name:      "default",
+			AccountID: sectionAccountID(cfg.Section("default")),
+		})
 	}
 
 	for i, s := range cfg.Sections() {
@@ -56,8 +81,25 @@ func LoadProfiles(configPath string) ([]string, error) {
 		}
 		name := s.Name()
 		if after, ok := strings.CutPrefix(name, "profile "); ok {
-			profiles = append(profiles, after)
+			profiles = append(profiles, Profile{
+				Name:      after,
+				AccountID: sectionAccountID(s),
+			})
 		}
 	}
 	return profiles, nil
+}
+
+// LoadProfiles returns all profile names from the given config file path.
+// [default] → "default", [profile foo] → "foo".
+func LoadProfiles(configPath string) ([]string, error) {
+	profiles, err := LoadProfileDetails(configPath)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(profiles))
+	for i, p := range profiles {
+		names[i] = p.Name
+	}
+	return names, nil
 }
