@@ -54,12 +54,8 @@ The version string is set at build time via `-ldflags "-X main.version=$(VERSION
 
 ### Integration tests
 
-Integration tests live in `integration_test.go` at the root and use the `//go:build integration` tag. They are excluded from the default `go test ./...` run and require `-tags integration`.
+Integration tests live in `integration_test.go` at the root and use the `//go:build integration` tag. They are excluded from the default `go test ./...` run and require `-tags integration`. Each test builds the binary into a temp dir and controls config/state via env vars: `AWS_CONFIG_FILE` points to a temp config file, `AWSCTX_STATE_DIR` points to a temp dir — both must be set together to fully isolate a test.
 
-## Task Execution Rules
+### `list` output format
 
-- Complete ALL tasks in the todo list before stopping
-- Do NOT pause for confirmation unless you hit a destructive/irreversible action
-- If stuck on a step, skip it, log the blocker, and continue to the next task
-- Do NOT summarize progress mid-task — only summarize when the ENTIRE list is done
-- Never ask "Should I continue?" — always continue unless explicitly blocked
+`awsctx list` writes to stdout (not eval'd by the shell wrapper). Current profile is marked with `*`; profiles without a resolvable account ID show `-` in that column.
