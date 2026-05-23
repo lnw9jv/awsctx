@@ -253,7 +253,7 @@ func TestList(t *testing.T) {
 	bin := buildBinary(t)
 	cfg := writeConfig(t, "[default]\nsso_account_id = 111122223333\n\n[profile dev]\nsso_account_id = 444455556666\n\n[profile prod]\n")
 
-	cmd := exec.Command(bin, "list")
+	cmd := exec.Command(bin, "list-profile")
 	cmd.Env = append(os.Environ(),
 		"AWS_CONFIG_FILE="+cfg,
 		"AWS_PROFILE=dev",
@@ -299,7 +299,7 @@ func TestListNoCurrentMark(t *testing.T) {
 	bin := buildBinary(t)
 	cfg := writeConfig(t, "[profile dev]\n[profile prod]\n")
 
-	cmd := exec.Command(bin, "list")
+	cmd := exec.Command(bin, "list-profile")
 	cmd.Env = append(os.Environ(),
 		"AWS_CONFIG_FILE="+cfg,
 		"AWS_PROFILE=",

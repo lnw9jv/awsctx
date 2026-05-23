@@ -10,7 +10,7 @@ import (
 )
 
 var listCmd = &cobra.Command{
-	Use:     "list",
+	Use:     "list-profile",
 	Aliases: []string{"ls"},
 	Short:   "List all AWS profiles with account IDs",
 	Args:    cobra.NoArgs,

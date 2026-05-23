@@ -56,6 +56,6 @@ The version string is set at build time via `-ldflags "-X main.version=$(VERSION
 
 Integration tests live in `integration_test.go` at the root and use the `//go:build integration` tag. They are excluded from the default `go test ./...` run and require `-tags integration`. Each test builds the binary into a temp dir and controls config/state via env vars: `AWS_CONFIG_FILE` points to a temp config file, `AWSCTX_STATE_DIR` points to a temp dir — both must be set together to fully isolate a test.
 
-### `list` output format
+### `list-profile` output format
 
-`awsctx list` writes to stdout (not eval'd by the shell wrapper). Current profile is marked with `*`; profiles without a resolvable account ID show `-` in that column.
+`awsctx list-profile` writes to stdout (not eval'd by the shell wrapper). Current profile is marked with `*`; profiles without a resolvable account ID show `-` in that column.
