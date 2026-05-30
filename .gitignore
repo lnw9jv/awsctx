@@ -5,3 +5,5 @@ awsctx-bin
 context-snapshot.json
 .cto-toolkit
 session-log.md
+graphify-out
+.remember
