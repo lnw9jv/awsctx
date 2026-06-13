@@ -46,7 +46,7 @@ awsctx shell-init fish | source
 
 | Command | Description |
 |---|---|
-| `awsctx` | Open interactive fuzzy picker (uses fzf if installed, built-in TUI otherwise) |
+| `awsctx` | Open interactive fuzzy picker (fzf, bundled in the binary) |
 | `awsctx <profile>` | Switch to named profile |
 | `awsctx -p <profile>` / `awsctx --profile <profile>` | Switch to named profile (flag form; tab-completes profiles) |
 | `awsctx -` | Switch to previous profile |
@@ -78,6 +78,7 @@ awsctx completion fish > ~/.config/fish/completions/awsctx.fish
 
 ## Requirements
 
-- Go 1.22+ (to build)
+- Go 1.23+ (to build)
 - `~/.aws/config` with `[profile <name>]` sections
-- [`fzf`](https://github.com/junegunn/fzf) (optional, recommended — `brew install fzf`)
+
+The fuzzy picker uses [fzf](https://github.com/junegunn/fzf), embedded as a Go library and compiled into the binary — no separate `fzf` install is required.

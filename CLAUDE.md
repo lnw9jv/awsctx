@@ -33,7 +33,7 @@ There is no lint target; run `go vet ./...` manually.
 
 - **`internal/state/`** — Manages the "previous profile" as a plain file at `~/.cache/awsctx/previous` (overridable via `AWSCTX_STATE_DIR`). Only two operations: `SetPrevious` and `GetPrevious`.
 
-- **`internal/picker/`** — `Pick()` tries fzf first (via `exec.LookPath`); falls back to the built-in TUI with a stderr tip. The built-in opens `/dev/tty` directly, puts the terminal in raw mode, and renders a fuzzy-filtered list with arrow-key navigation using ANSI escape codes and `golang.org/x/term`. fzf exit code 130 is treated as user-cancelled.
+- **`internal/picker/`** — `Pick()` embeds fzf in-process via the `github.com/junegunn/fzf/src` library (compiled into the binary, so no external `fzf` install is required). It parses options with `fzf.ParseOptions(true, ["--ansi", "--no-preview"])`, feeds profile names through `opts.Input` (a goroutine, current profile colored green via ANSI) and reads the selection back from `opts.Output`, then calls `fzf.Run(opts)`. Exit codes are mapped: `ExitInterrupt` (130) → "cancelled", `ExitNoMatch` (1) → "no profile selected". **stdout guard**: `guardStdout()` repoints `os.Stdout` to `/dev/tty` (falling back to stderr) for the duration of `Run()` and restores it after — this protects the stdout invariant below, since fzf must never write to the stdout the shell wrapper `eval`s.
 
 ### stdout/stderr contract
 

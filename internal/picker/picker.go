@@ -1,28 +1,25 @@
 package picker
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 
-	"golang.org/x/term"
+	fzf "github.com/junegunn/fzf/src"
 )
 
-// Pick tries fzf first; falls back to the built-in TUI if fzf is not installed.
+// Pick runs an embedded fzf (the github.com/junegunn/fzf/src library, compiled
+// into the binary) so users don't need a separately installed fzf.
+//
+// stdout invariant: the shell wrapper eval's everything on stdout, so the
+// picker must never let fzf write there. The selection comes back via the
+// Output channel, and fzf's UI is drawn to the terminal — but we still redirect
+// os.Stdout to /dev/tty for the duration of Run() to guarantee nothing fzf
+// might print can corrupt the shell environment.
 func Pick(items []string, currentProfile string) (string, error) {
 	if len(items) == 0 {
 		return "", fmt.Errorf("no AWS profiles found")
 	}
-	if _, err := exec.LookPath("fzf"); err == nil {
-		return pickWithFzf(items, currentProfile)
-	}
-	fmt.Fprintln(os.Stderr, "tip: install fzf for a better picker (brew install fzf)")
-	return pickLegacy(items, currentProfile)
-}
 
-func pickWithFzf(items []string, currentProfile string) (string, error) {
 	// Color the current profile green, matching kubectx's style.
 	// fzf strips ANSI codes from output, so the returned string is plain.
 	lines := make([]string, len(items))
@@ -34,119 +31,61 @@ func pickWithFzf(items []string, currentProfile string) (string, error) {
 		}
 	}
 
-	var stdout bytes.Buffer
-	cmd := exec.Command("fzf", "--ansi", "--no-preview")
-	cmd.Stdin = strings.NewReader(strings.Join(lines, "\n"))
-	cmd.Stdout = &stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 130 {
-			return "", fmt.Errorf("cancelled")
-		}
+	opts, err := fzf.ParseOptions(true, []string{"--ansi", "--no-preview"})
+	if err != nil {
 		return "", fmt.Errorf("fzf: %w", err)
 	}
 
-	selected := strings.TrimSpace(stdout.String())
+	inputChan := make(chan string)
+	go func() {
+		for _, l := range lines {
+			inputChan <- l
+		}
+		close(inputChan)
+	}()
+
+	outputChan := make(chan string, len(items))
+	opts.Input = inputChan
+	opts.Output = outputChan
+
+	restore := guardStdout()
+	code, runErr := fzf.Run(opts)
+	close(outputChan)
+	restore()
+
+	switch code {
+	case fzf.ExitInterrupt:
+		return "", fmt.Errorf("cancelled")
+	case fzf.ExitNoMatch:
+		return "", fmt.Errorf("no profile selected")
+	}
+	if runErr != nil {
+		return "", fmt.Errorf("fzf: %w", runErr)
+	}
+
+	var selected string
+	for s := range outputChan {
+		selected = s // single-select: keep the one (last) line
+	}
 	if selected == "" {
 		return "", fmt.Errorf("no profile selected")
 	}
 	return selected, nil
 }
 
-// pickLegacy is the original from-scratch TUI used when fzf is not available.
-func pickLegacy(items []string, currentProfile string) (string, error) {
-	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+// guardStdout points os.Stdout away from the real stdout (which the shell
+// wrapper eval's) for the duration of fzf.Run, preferring /dev/tty and falling
+// back to stderr. It returns a function that restores the original os.Stdout.
+func guardStdout() func() {
+	saved := os.Stdout
+	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
 	if err != nil {
-		return "", fmt.Errorf("cannot open terminal: %w", err)
+		os.Stdout = os.Stderr
+		return func() { os.Stdout = saved }
 	}
-	defer tty.Close()
-
-	fd := int(tty.Fd())
-	oldState, err := term.MakeRaw(fd)
-	if err != nil {
-		return "", err
-	}
-	defer term.Restore(fd, oldState)
-
-	query := ""
-	cursor := 0
-
-	for {
-		filtered := filter(items, query)
-		if cursor >= len(filtered) {
-			cursor = max(0, len(filtered)-1)
-		}
-
-		render(tty, query, filtered, cursor, currentProfile)
-
-		b := make([]byte, 4)
-		n, err := tty.Read(b)
-		if err != nil || n == 0 {
-			return "", fmt.Errorf("read error")
-		}
-
-		switch {
-		case b[0] == 13: // Enter
-			fmt.Fprintf(tty, "\r\n")
-			if len(filtered) == 0 {
-				return "", fmt.Errorf("no profile selected")
-			}
-			return filtered[cursor], nil
-		case b[0] == 3 || b[0] == 27 && n == 1: // Ctrl-C or Escape
-			fmt.Fprintf(tty, "\r\n")
-			return "", fmt.Errorf("cancelled")
-		case n >= 3 && b[0] == 27 && b[1] == 91 && b[2] == 65: // Up
-			if cursor > 0 {
-				cursor--
-			}
-		case n >= 3 && b[0] == 27 && b[1] == 91 && b[2] == 66: // Down
-			if cursor < len(filtered)-1 {
-				cursor++
-			}
-		case b[0] == 127 || b[0] == 8: // Backspace
-			if len(query) > 0 {
-				query = query[:len(query)-1]
-				cursor = 0
-			}
-		default:
-			if b[0] >= 32 && b[0] < 127 {
-				query += string(b[:1])
-				cursor = 0
-			}
-		}
+	os.Stdout = tty
+	return func() {
+		os.Stdout = saved
+		tty.Close()
 	}
 }
-
-func filter(items []string, query string) []string {
-	if query == "" {
-		return items
-	}
-	q := strings.ToLower(query)
-	var out []string
-	for _, item := range items {
-		if strings.Contains(strings.ToLower(item), q) {
-			out = append(out, item)
-		}
-	}
-	return out
-}
-
-func render(tty *os.File, query string, filtered []string, cursor int, current string) {
-	fmt.Fprintf(tty, "\r\033[K> %s\r\n", query)
-	for i, p := range filtered {
-		label := p
-		if p == current {
-			label += " ✓"
-		}
-		if i == cursor {
-			fmt.Fprintf(tty, "\r\033[K\033[7m  %s\033[0m\r\n", label)
-		} else {
-			fmt.Fprintf(tty, "\r\033[K  %s\r\n", label)
-		}
-	}
-	lines := len(filtered) + 1
-	fmt.Fprintf(tty, "\033[%dA", lines)
-	fmt.Fprintf(tty, "\r\033[%dC", len(query)+2)
-}
-
