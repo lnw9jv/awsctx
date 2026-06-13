@@ -78,7 +78,7 @@ awsctx completion fish > ~/.config/fish/completions/awsctx.fish
 
 ## Requirements
 
-- Go 1.23+ (to build)
+- Go 1.26+ (to build)
 - `~/.aws/config` with `[profile <name>]` sections
 
 The fuzzy picker uses [fzf](https://github.com/junegunn/fzf), embedded as a Go library and compiled into the binary — no separate `fzf` install is required.
