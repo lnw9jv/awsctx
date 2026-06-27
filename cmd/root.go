@@ -44,13 +44,13 @@ var rootCmd = &cobra.Command{
 			target = args[0]
 		}
 		if target == "-" {
-			st := state.New(state.DefaultDir())
-			prev, err := st.GetPrevious()
+			dir := state.DefaultDir()
+			prev, err := state.GetPrevious(dir)
 			if err != nil {
 				return err
 			}
 			if current := os.Getenv("AWS_PROFILE"); current != "" {
-				_ = st.SetPrevious(current)
+				_ = state.SetPrevious(dir, current)
 			}
 			fmt.Printf("export AWS_PROFILE=%s\n", prev)
 			if regionFlag != "" {
@@ -63,7 +63,7 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 		if target != "" {
-			if err := switchProfile(target); err != nil {
+			if err := switchProfile(target, nil); err != nil {
 				return err
 			}
 			if regionFlag != "" {
@@ -79,7 +79,7 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := switchProfile(selected); err != nil {
+		if err := switchProfile(selected, profiles); err != nil {
 			return err
 		}
 		if regionFlag != "" {

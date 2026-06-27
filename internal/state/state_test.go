@@ -8,11 +8,10 @@ import (
 
 func TestPreviousRoundtrip(t *testing.T) {
 	dir := t.TempDir()
-	s := state.New(dir)
-	if err := s.SetPrevious("dev"); err != nil {
+	if err := state.SetPrevious(dir, "dev"); err != nil {
 		t.Fatal(err)
 	}
-	prev, err := s.GetPrevious()
+	prev, err := state.GetPrevious(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,8 +21,7 @@ func TestPreviousRoundtrip(t *testing.T) {
 }
 
 func TestPreviousNotExist(t *testing.T) {
-	s := state.New(t.TempDir())
-	_, err := s.GetPrevious()
+	_, err := state.GetPrevious(t.TempDir())
 	if err == nil {
 		t.Fatal("expected error when no previous profile")
 	}

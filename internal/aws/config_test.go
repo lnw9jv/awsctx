@@ -97,6 +97,57 @@ func TestLoadProfileDetails_RoleARN(t *testing.T) {
 	}
 }
 
+func TestLoadProfileDetails_IgnoresNonProfileSections(t *testing.T) {
+	f, _ := os.CreateTemp("", "aws-config-*")
+	// An [sso-session] block (with its own sso_account_id) sits between two real
+	// profiles: it must not become a profile, and the scanner must not carry its
+	// keys over to the profile that follows.
+	f.WriteString("[default]\nsso_account_id = 111111111111\n\n" +
+		"[sso-session my-sso]\nsso_account_id = 999999999999\nsso_region = us-east-1\n\n" +
+		"[profile dev]\nsso_account_id = 222222222222\n")
+	f.Close()
+
+	profiles, err := aws.LoadProfileDetails(f.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(profiles) != 2 {
+		t.Fatalf("expected 2 profiles (sso-session ignored), got %d: %v", len(profiles), profiles)
+	}
+
+	byName := map[string]aws.Profile{}
+	for _, p := range profiles {
+		byName[p.Name] = p
+	}
+	if _, ok := byName["my-sso"]; ok {
+		t.Error("[sso-session my-sso] must not be returned as a profile")
+	}
+	if byName["default"].AccountID != "111111111111" {
+		t.Errorf("default: got %q, want 111111111111", byName["default"].AccountID)
+	}
+	if byName["dev"].AccountID != "222222222222" {
+		t.Errorf("dev: got %q, want 222222222222 (must not inherit sso-session keys)", byName["dev"].AccountID)
+	}
+}
+
+func TestLoadProfileDetails_SkipsComments(t *testing.T) {
+	f, _ := os.CreateTemp("", "aws-config-*")
+	f.WriteString("# a hash comment\n; a semicolon comment\n[profile dev]\n" +
+		"# inside the section\nsso_account_id = 222222222222\n; trailing comment\n")
+	f.Close()
+
+	profiles, err := aws.LoadProfileDetails(f.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(profiles) != 1 {
+		t.Fatalf("expected 1 profile, got %d: %v", len(profiles), profiles)
+	}
+	if profiles[0].Name != "dev" || profiles[0].AccountID != "222222222222" {
+		t.Errorf("got %+v, want {dev 222222222222}", profiles[0])
+	}
+}
+
 func TestLoadProfileDetails_SSOPreferredOverAccountID(t *testing.T) {
 	f, _ := os.CreateTemp("", "aws-config-*")
 	f.WriteString("[profile dev]\nsso_account_id = 111111111111\naccount_id = 999999999999\n")

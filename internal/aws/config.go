@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"gopkg.in/ini.v1"
 )
 
 // Profile holds a profile name and its AWS account ID (empty when absent).
@@ -27,34 +25,16 @@ func ConfigPath() string {
 	return filepath.Join(home, ".aws", "config")
 }
 
-// hasDefaultSection reports whether the config file contains an explicit [default] section.
-// ini.v1 stores [default] as a named section "default" (not the synthetic root at index 0),
-// but does not include it in sections iterable via CutPrefix("profile "), so we detect it separately.
-func hasDefaultSection(configPath string) bool {
-	f, err := os.Open(configPath)
-	if err != nil {
-		return false
-	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if strings.EqualFold(line, "[default]") {
-			return true
-		}
-	}
-	_ = sc.Err() // scanner errors are treated as "not found"
-	return false
-}
-
-func sectionAccountID(sec *ini.Section) string {
-	for _, key := range []string{"sso_account_id", "account_id"} {
-		if v := sec.Key(key).String(); v != "" {
+// accountID resolves a profile's account ID from its keys, in order:
+// sso_account_id → account_id → the account segment of role_arn
+// (arn:aws:iam::ACCOUNT:role/NAME).
+func accountID(keys map[string]string) string {
+	for _, k := range []string{"sso_account_id", "account_id"} {
+		if v := keys[k]; v != "" {
 			return v
 		}
 	}
-	// Fall back to extracting account ID from role_arn (arn:aws:iam::ACCOUNT:role/NAME).
-	if arn := sec.Key("role_arn").String(); arn != "" {
+	if arn := keys["role_arn"]; arn != "" {
 		parts := strings.SplitN(arn, ":", 6)
 		if len(parts) >= 5 && parts[4] != "" {
 			return parts[4]
@@ -65,35 +45,54 @@ func sectionAccountID(sec *ini.Section) string {
 
 // LoadProfileDetails returns all profiles from the given config file path, including account IDs.
 // [default] → Profile{Name:"default"}, [profile foo] → Profile{Name:"foo"}.
+// Other sections (e.g. [sso-session foo]) are ignored.
 func LoadProfileDetails(configPath string) ([]Profile, error) {
-	cfg, err := ini.LoadSources(ini.LoadOptions{
-		IgnoreInlineComment: true,
-	}, configPath)
+	f, err := os.Open(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read AWS config %s: %w", configPath, err)
 	}
+	defer f.Close()
 
 	var profiles []Profile
-	if hasDefaultSection(configPath) {
-		// ini.v1 stores [default] as a named section "default" (not the synthetic root).
-		profiles = append(profiles, Profile{
-			Name:      "default",
-			AccountID: sectionAccountID(cfg.Section("default")),
-		})
+	var name string             // current profile name, "" when current section isn't a profile
+	var keys map[string]string  // keys of the current profile section
+	flush := func() {
+		if name != "" {
+			profiles = append(profiles, Profile{Name: name, AccountID: accountID(keys)})
+		}
 	}
 
-	for i, s := range cfg.Sections() {
-		if i == 0 {
-			continue // always skip synthetic root
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || line[0] == '#' || line[0] == ';' {
+			continue
 		}
-		name := s.Name()
-		if after, ok := strings.CutPrefix(name, "profile "); ok {
-			profiles = append(profiles, Profile{
-				Name:      after,
-				AccountID: sectionAccountID(s),
-			})
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			flush()
+			header := strings.TrimSpace(line[1 : len(line)-1])
+			switch {
+			case header == "default":
+				name = "default"
+			case strings.HasPrefix(header, "profile "):
+				name = strings.TrimSpace(strings.TrimPrefix(header, "profile "))
+			default:
+				name = "" // not a profile section
+			}
+			keys = map[string]string{}
+			continue
+		}
+		// key = value (inline comments are kept as part of the value, matching prior behavior)
+		if name != "" {
+			if k, v, ok := strings.Cut(line, "="); ok {
+				keys[strings.ToLower(strings.TrimSpace(k))] = strings.TrimSpace(v)
+			}
 		}
 	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("cannot read AWS config %s: %w", configPath, err)
+	}
+	flush()
 	return profiles, nil
 }
 

@@ -5,7 +5,6 @@ go 1.26.2
 require (
 	github.com/junegunn/fzf v0.73.1
 	github.com/spf13/cobra v1.10.2
-	gopkg.in/ini.v1 v1.67.3
 )
 
 require (
