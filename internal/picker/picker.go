@@ -1,6 +1,7 @@
 package picker
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -17,7 +18,7 @@ import (
 // might print can corrupt the shell environment.
 func Pick(items []string, currentProfile string) (string, error) {
 	if len(items) == 0 {
-		return "", fmt.Errorf("no AWS profiles found")
+		return "", errors.New("no AWS profiles found")
 	}
 
 	// Color the current profile green, matching kubectx's style.
@@ -55,9 +56,9 @@ func Pick(items []string, currentProfile string) (string, error) {
 
 	switch code {
 	case fzf.ExitInterrupt:
-		return "", fmt.Errorf("cancelled")
+		return "", errors.New("cancelled")
 	case fzf.ExitNoMatch:
-		return "", fmt.Errorf("no profile selected")
+		return "", errors.New("no profile selected")
 	}
 	if runErr != nil {
 		return "", fmt.Errorf("fzf: %w", runErr)
@@ -68,7 +69,7 @@ func Pick(items []string, currentProfile string) (string, error) {
 		selected = s // single-select: keep the one (last) line
 	}
 	if selected == "" {
-		return "", fmt.Errorf("no profile selected")
+		return "", errors.New("no profile selected")
 	}
 	return selected, nil
 }

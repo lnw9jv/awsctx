@@ -13,7 +13,7 @@ import (
 func buildBinary(t *testing.T) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), "awsctx")
-	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", bin, ".")
+	cmd := exec.CommandContext(t.Context(), "go", "build", "-buildvcs=false", "-o", bin, ".")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -38,7 +38,7 @@ func TestSwitchByName(t *testing.T) {
 	cfg := writeConfig(t, "[default]\n[profile dev]\n[profile prod]\n")
 	stateDir := t.TempDir()
 
-	cmd := exec.Command(bin, "dev")
+	cmd := exec.CommandContext(t.Context(), bin, "dev")
 	cmd.Env = append(os.Environ(),
 		"AWS_CONFIG_FILE="+cfg,
 		"AWSCTX_STATE_DIR="+stateDir,
@@ -58,7 +58,7 @@ func TestSwitchPrevious(t *testing.T) {
 	stateDir := t.TempDir()
 
 	run := func(profile string, args ...string) string {
-		cmd := exec.Command(bin, args...)
+		cmd := exec.CommandContext(t.Context(), bin, args...)
 		cmd.Env = append(os.Environ(),
 			"AWS_CONFIG_FILE="+cfg,
 			"AWSCTX_STATE_DIR="+stateDir,
@@ -78,9 +78,31 @@ func TestSwitchPrevious(t *testing.T) {
 	}
 }
 
+func TestSwitchPreviousDeleted(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[profile dev]\n")
+	stateDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(stateDir, "previous"), []byte("gone"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.CommandContext(t.Context(), bin, "-")
+	cmd.Env = append(os.Environ(),
+		"AWS_CONFIG_FILE="+cfg,
+		"AWSCTX_STATE_DIR="+stateDir,
+	)
+	out, err := cmd.Output()
+	if err == nil {
+		t.Fatal("expected error when previous profile no longer exists in config")
+	}
+	if len(out) != 0 {
+		t.Errorf("expected empty stdout, got %q", out)
+	}
+}
+
 func TestUnset(t *testing.T) {
 	bin := buildBinary(t)
-	cmd := exec.Command(bin, "-u")
+	cmd := exec.CommandContext(t.Context(), bin, "-u")
 	cmd.Env = os.Environ()
 	out, err := cmd.Output()
 	if err != nil {
@@ -95,7 +117,7 @@ func TestUnset(t *testing.T) {
 
 func TestRegionFlag(t *testing.T) {
 	bin := buildBinary(t)
-	cmd := exec.Command(bin, "-r", "us-east-1")
+	cmd := exec.CommandContext(t.Context(), bin, "-r", "us-east-1")
 	cmd.Env = os.Environ()
 	out, err := cmd.Output()
 	if err != nil {
@@ -111,7 +133,7 @@ func TestRegionFlagWithProfile(t *testing.T) {
 	cfg := writeConfig(t, "[default]\n[profile dev]\n")
 	stateDir := t.TempDir()
 
-	cmd := exec.Command(bin, "dev", "-r", "ap-southeast-1")
+	cmd := exec.CommandContext(t.Context(), bin, "dev", "-r", "ap-southeast-1")
 	cmd.Env = append(os.Environ(),
 		"AWS_CONFIG_FILE="+cfg,
 		"AWSCTX_STATE_DIR="+stateDir,
@@ -132,7 +154,7 @@ func TestProfileFlag(t *testing.T) {
 	cfg := writeConfig(t, "[default]\n[profile dev]\n[profile prod]\n")
 	stateDir := t.TempDir()
 
-	cmd := exec.Command(bin, "--profile", "dev")
+	cmd := exec.CommandContext(t.Context(), bin, "--profile", "dev")
 	cmd.Env = append(os.Environ(),
 		"AWS_CONFIG_FILE="+cfg,
 		"AWSCTX_STATE_DIR="+stateDir,
@@ -151,7 +173,7 @@ func TestProfileShortFlag(t *testing.T) {
 	cfg := writeConfig(t, "[default]\n[profile dev]\n[profile prod]\n")
 	stateDir := t.TempDir()
 
-	cmd := exec.Command(bin, "-p", "prod")
+	cmd := exec.CommandContext(t.Context(), bin, "-p", "prod")
 	cmd.Env = append(os.Environ(),
 		"AWS_CONFIG_FILE="+cfg,
 		"AWSCTX_STATE_DIR="+stateDir,
@@ -170,7 +192,7 @@ func TestProfileFlagWithRegion(t *testing.T) {
 	cfg := writeConfig(t, "[default]\n[profile dev]\n")
 	stateDir := t.TempDir()
 
-	cmd := exec.Command(bin, "--profile", "dev", "-r", "ap-southeast-1")
+	cmd := exec.CommandContext(t.Context(), bin, "--profile", "dev", "-r", "ap-southeast-1")
 	cmd.Env = append(os.Environ(),
 		"AWS_CONFIG_FILE="+cfg,
 		"AWSCTX_STATE_DIR="+stateDir,
@@ -192,7 +214,7 @@ func TestProfileFlagPrevious(t *testing.T) {
 	stateDir := t.TempDir()
 
 	run := func(profile string, args ...string) string {
-		cmd := exec.Command(bin, args...)
+		cmd := exec.CommandContext(t.Context(), bin, args...)
 		cmd.Env = append(os.Environ(),
 			"AWS_CONFIG_FILE="+cfg,
 			"AWSCTX_STATE_DIR="+stateDir,
@@ -218,7 +240,7 @@ func TestProfileFlagCompletion(t *testing.T) {
 
 	for _, flag := range []string{"--profile", "-p"} {
 		t.Run(flag, func(t *testing.T) {
-			cmd := exec.Command(bin, "__complete", flag, "")
+			cmd := exec.CommandContext(t.Context(), bin, "__complete", flag, "")
 			cmd.Env = append(os.Environ(), "AWS_CONFIG_FILE="+cfg)
 			out, err := cmd.Output()
 			if err != nil {
@@ -238,7 +260,7 @@ func TestPositionalArgNoCompletion(t *testing.T) {
 	bin := buildBinary(t)
 	cfg := writeConfig(t, "[profile dev]\n[profile prod]\n")
 
-	cmd := exec.Command(bin, "__complete", "")
+	cmd := exec.CommandContext(t.Context(), bin, "__complete", "")
 	cmd.Env = append(os.Environ(), "AWS_CONFIG_FILE="+cfg)
 	out, _ := cmd.Output()
 	got := string(out)
@@ -253,7 +275,7 @@ func TestList(t *testing.T) {
 	bin := buildBinary(t)
 	cfg := writeConfig(t, "[default]\nsso_account_id = 111122223333\n\n[profile dev]\nsso_account_id = 444455556666\n\n[profile prod]\n")
 
-	cmd := exec.Command(bin, "list-profile")
+	cmd := exec.CommandContext(t.Context(), bin, "list-profile")
 	cmd.Env = append(os.Environ(),
 		"AWS_CONFIG_FILE="+cfg,
 		"AWS_PROFILE=dev",
@@ -281,7 +303,7 @@ func TestListAlias(t *testing.T) {
 	bin := buildBinary(t)
 	cfg := writeConfig(t, "[profile dev]\n[profile prod]\n")
 
-	cmd := exec.Command(bin, "ls")
+	cmd := exec.CommandContext(t.Context(), bin, "ls")
 	cmd.Env = append(os.Environ(), "AWS_CONFIG_FILE="+cfg)
 	out, err := cmd.Output()
 	if err != nil {
@@ -299,7 +321,7 @@ func TestListNoCurrentMark(t *testing.T) {
 	bin := buildBinary(t)
 	cfg := writeConfig(t, "[profile dev]\n[profile prod]\n")
 
-	cmd := exec.Command(bin, "list-profile")
+	cmd := exec.CommandContext(t.Context(), bin, "list-profile")
 	cmd.Env = append(os.Environ(),
 		"AWS_CONFIG_FILE="+cfg,
 		"AWS_PROFILE=",
@@ -315,7 +337,7 @@ func TestListNoCurrentMark(t *testing.T) {
 
 func TestCurrent(t *testing.T) {
 	bin := buildBinary(t)
-	cmd := exec.Command(bin, "-c")
+	cmd := exec.CommandContext(t.Context(), bin, "-c")
 	cmd.Env = append(os.Environ(), "AWS_PROFILE=staging")
 	out, err := cmd.Output()
 	if err != nil {

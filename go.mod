@@ -3,7 +3,7 @@ module github.com/lnw9jv/awsctx
 go 1.26.2
 
 require (
-	github.com/junegunn/fzf v0.73.1
+	github.com/junegunn/fzf v0.74.0
 	github.com/spf13/cobra v1.10.2
 )
 
@@ -17,7 +17,7 @@ require (
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/term v0.44.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/term v0.45.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 )

@@ -40,12 +40,18 @@ awsctx() {
 const ShellWrapperFish = `
 # awsctx shell integration
 function awsctx
-  set out (command awsctx $argv)
+  set -l out (command awsctx $argv)
   or return $status
-  if string match -q 'export *' $out; or string match -q 'unset *' $out
-    eval (echo $out | sed 's/export /set -gx /' | sed 's/unset /set -e /')
-  else
-    echo $out
+  for line in $out
+    switch $line
+      case 'export *'
+        set -l kv (string split -m1 '=' -- (string replace -r '^export ' '' -- $line))
+        set -gx $kv[1] $kv[2]
+      case 'unset *'
+        set -e (string replace -r '^unset ' '' -- $line)
+      case '*'
+        echo $line
+    end
   end
 end
 `

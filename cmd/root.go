@@ -44,19 +44,11 @@ var rootCmd = &cobra.Command{
 			target = args[0]
 		}
 		if target == "-" {
-			dir := state.DefaultDir()
-			prev, err := state.GetPrevious(dir)
+			prev, err := state.GetPrevious(state.DefaultDir())
 			if err != nil {
 				return err
 			}
-			if current := os.Getenv("AWS_PROFILE"); current != "" {
-				_ = state.SetPrevious(dir, current)
-			}
-			fmt.Printf("export AWS_PROFILE=%s\n", prev)
-			if regionFlag != "" {
-				fmt.Printf("export AWS_DEFAULT_REGION=%s\n", regionFlag)
-			}
-			return nil
+			target = prev // falls through to switchProfile, which validates it still exists
 		}
 		if target == "" && regionFlag != "" {
 			fmt.Printf("export AWS_DEFAULT_REGION=%s\n", regionFlag)
