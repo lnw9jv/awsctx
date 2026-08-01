@@ -34,5 +34,9 @@ func GetPrevious(dir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(string(b)), nil
+	profile := strings.TrimSpace(string(b))
+	if profile == "" {
+		return "", errors.New("previous profile state is empty")
+	}
+	return profile, nil
 }

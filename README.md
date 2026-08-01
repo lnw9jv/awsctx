@@ -74,7 +74,7 @@ awsctx completion fish > ~/.config/fish/completions/awsctx.fish
 
 ## How it works
 
-`awsctx` reads profiles from `~/.aws/config` (or `$AWS_CONFIG_FILE`). When you switch, it prints `export AWS_PROFILE=<name>` to stdout — the shell wrapper `eval`s that output so the variable propagates to your current shell session. The previous profile is saved to `~/.cache/awsctx/previous`.
+`awsctx` reads profiles from `~/.aws/config` (or `$AWS_CONFIG_FILE`). When you switch, it prints allowlisted `export`/`unset` operations to stdout. The shell wrapper parses those operations without evaluating their values as shell code, then applies them to the current shell. The previous profile is saved to `~/.cache/awsctx/previous`.
 
 ## Requirements
 

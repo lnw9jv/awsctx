@@ -2,17 +2,25 @@ package aws_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/lnw9jv/awsctx/internal/aws"
 )
 
-func TestLoadProfiles(t *testing.T) {
-	f, _ := os.CreateTemp("", "aws-config-*")
-	f.WriteString("[default]\n[profile dev]\n[profile prod]\n")
-	f.Close()
+func writeConfig(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
 
-	profiles, err := aws.LoadProfiles(f.Name())
+func TestLoadProfiles(t *testing.T) {
+	path := writeConfig(t, "[default]\n[profile dev]\n[profile prod]\n")
+
+	profiles, err := aws.LoadProfiles(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,11 +39,9 @@ func TestLoadProfiles(t *testing.T) {
 }
 
 func TestLoadProfilesNoDefault(t *testing.T) {
-	f, _ := os.CreateTemp("", "aws-config-*")
-	f.WriteString("[profile staging]\n[profile prod]\n")
-	f.Close()
+	path := writeConfig(t, "[profile staging]\n[profile prod]\n")
 
-	profiles, err := aws.LoadProfiles(f.Name())
+	profiles, err := aws.LoadProfiles(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,11 +51,9 @@ func TestLoadProfilesNoDefault(t *testing.T) {
 }
 
 func TestLoadProfileDetails(t *testing.T) {
-	f, _ := os.CreateTemp("", "aws-config-*")
-	f.WriteString("[default]\nsso_account_id = 111111111111\n\n[profile dev]\nsso_account_id = 222222222222\n\n[profile prod]\naccount_id = 333333333333\n\n[profile staging]\n")
-	f.Close()
+	path := writeConfig(t, "[default]\nsso_account_id = 111111111111\n\n[profile dev]\nsso_account_id = 222222222222\n\n[profile prod]\naccount_id = 333333333333\n\n[profile staging]\n")
 
-	profiles, err := aws.LoadProfileDetails(f.Name())
+	profiles, err := aws.LoadProfileDetails(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,11 +85,9 @@ func TestLoadProfileDetails(t *testing.T) {
 }
 
 func TestLoadProfileDetails_RoleARN(t *testing.T) {
-	f, _ := os.CreateTemp("", "aws-config-*")
-	f.WriteString("[profile prod]\nrole_arn = arn:aws:iam::123456789012:role/MyRole\nsource_profile = default\n")
-	f.Close()
+	path := writeConfig(t, "[profile prod]\nrole_arn = arn:aws:iam::123456789012:role/MyRole\nsource_profile = default\n")
 
-	profiles, err := aws.LoadProfileDetails(f.Name())
+	profiles, err := aws.LoadProfileDetails(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,16 +100,14 @@ func TestLoadProfileDetails_RoleARN(t *testing.T) {
 }
 
 func TestLoadProfileDetails_IgnoresNonProfileSections(t *testing.T) {
-	f, _ := os.CreateTemp("", "aws-config-*")
 	// An [sso-session] block (with its own sso_account_id) sits between two real
 	// profiles: it must not become a profile, and the scanner must not carry its
 	// keys over to the profile that follows.
-	f.WriteString("[default]\nsso_account_id = 111111111111\n\n" +
-		"[sso-session my-sso]\nsso_account_id = 999999999999\nsso_region = us-east-1\n\n" +
+	path := writeConfig(t, "[default]\nsso_account_id = 111111111111\n\n"+
+		"[sso-session my-sso]\nsso_account_id = 999999999999\nsso_region = us-east-1\n\n"+
 		"[profile dev]\nsso_account_id = 222222222222\n")
-	f.Close()
 
-	profiles, err := aws.LoadProfileDetails(f.Name())
+	profiles, err := aws.LoadProfileDetails(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,12 +131,10 @@ func TestLoadProfileDetails_IgnoresNonProfileSections(t *testing.T) {
 }
 
 func TestLoadProfileDetails_SkipsComments(t *testing.T) {
-	f, _ := os.CreateTemp("", "aws-config-*")
-	f.WriteString("# a hash comment\n; a semicolon comment\n[profile dev]\n" +
+	path := writeConfig(t, "# a hash comment\n; a semicolon comment\n[profile dev]\n"+
 		"# inside the section\nsso_account_id = 222222222222\n; trailing comment\n")
-	f.Close()
 
-	profiles, err := aws.LoadProfileDetails(f.Name())
+	profiles, err := aws.LoadProfileDetails(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,11 +147,9 @@ func TestLoadProfileDetails_SkipsComments(t *testing.T) {
 }
 
 func TestLoadProfileDetails_SSOPreferredOverAccountID(t *testing.T) {
-	f, _ := os.CreateTemp("", "aws-config-*")
-	f.WriteString("[profile dev]\nsso_account_id = 111111111111\naccount_id = 999999999999\n")
-	f.Close()
+	path := writeConfig(t, "[profile dev]\nsso_account_id = 111111111111\naccount_id = 999999999999\n")
 
-	profiles, err := aws.LoadProfileDetails(f.Name())
+	profiles, err := aws.LoadProfileDetails(path)
 	if err != nil {
 		t.Fatal(err)
 	}

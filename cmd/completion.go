@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -17,14 +19,17 @@ var completionCmd = &cobra.Command{
 			return rootCmd.GenBashCompletion(cmd.OutOrStdout())
 		case "fish":
 			return rootCmd.GenFishCompletion(cmd.OutOrStdout(), true)
+		default:
+			return fmt.Errorf("unsupported shell %q — use zsh, bash, or fish", args[0])
 		}
-		return nil
 	},
 }
 
+// AWSRegions follows https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-regions.html.
 var AWSRegions = []string{
 	"af-south-1\tAfrica (Cape Town)",
 	"ap-east-1\tAsia Pacific (Hong Kong)",
+	"ap-east-2\tAsia Pacific (Taipei)",
 	"ap-northeast-1\tAsia Pacific (Tokyo)",
 	"ap-northeast-2\tAsia Pacific (Seoul)",
 	"ap-northeast-3\tAsia Pacific (Osaka)",
@@ -35,9 +40,10 @@ var AWSRegions = []string{
 	"ap-southeast-3\tAsia Pacific (Jakarta)",
 	"ap-southeast-4\tAsia Pacific (Melbourne)",
 	"ap-southeast-5\tAsia Pacific (Malaysia)",
+	"ap-southeast-6\tAsia Pacific (New Zealand)",
 	"ap-southeast-7\tAsia Pacific (Thailand)",
 	"ca-central-1\tCanada (Central)",
-	"ca-west-1\tCanada (Calgary)",
+	"ca-west-1\tCanada West (Calgary)",
 	"cn-north-1\tChina (Beijing)",
 	"cn-northwest-1\tChina (Ningxia)",
 	"eu-central-1\tEurope (Frankfurt)",
@@ -67,6 +73,4 @@ func init() {
 	rootCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-
-
 }

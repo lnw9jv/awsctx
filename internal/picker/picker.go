@@ -11,11 +11,11 @@ import (
 // Pick runs an embedded fzf (the github.com/junegunn/fzf/src library, compiled
 // into the binary) so users don't need a separately installed fzf.
 //
-// stdout invariant: the shell wrapper eval's everything on stdout, so the
-// picker must never let fzf write there. The selection comes back via the
-// Output channel, and fzf's UI is drawn to the terminal — but we still redirect
-// os.Stdout to /dev/tty for the duration of Run() to guarantee nothing fzf
-// might print can corrupt the shell environment.
+// stdout invariant: shell wrappers interpret machine-readable lines on stdout,
+// so the picker must never let fzf write there. The selection comes back via
+// the Output channel, and fzf's UI is drawn to the terminal — but we still
+// redirect os.Stdout to /dev/tty for the duration of Run() to guarantee nothing
+// fzf might print can corrupt the shell environment.
 func Pick(items []string, currentProfile string) (string, error) {
 	if len(items) == 0 {
 		return "", errors.New("no AWS profiles found")
@@ -74,9 +74,9 @@ func Pick(items []string, currentProfile string) (string, error) {
 	return selected, nil
 }
 
-// guardStdout points os.Stdout away from the real stdout (which the shell
-// wrapper eval's) for the duration of fzf.Run, preferring /dev/tty and falling
-// back to stderr. It returns a function that restores the original os.Stdout.
+// guardStdout points os.Stdout away from the machine-readable stdout for the
+// duration of fzf.Run, preferring /dev/tty and falling back to stderr. It
+// returns a function that restores the original os.Stdout.
 func guardStdout() func() {
 	saved := os.Stdout
 	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	awscfg "github.com/lnw9jv/awsctx/internal/aws"
 	"github.com/spf13/cobra"
@@ -23,18 +24,16 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if len(profiles) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No profiles found.")
-		return nil
+		return writeOutput(cmd.OutOrStdout(), "No profiles found.\n")
 	}
-	printProfileTable(cmd.OutOrStdout(), profiles, os.Getenv("AWS_PROFILE"))
-	return nil
+	return printProfileTable(cmd.OutOrStdout(), profiles, os.Getenv("AWS_PROFILE"))
 }
 
 // printProfileTable writes the profile list to w.
 // Every data row is prefixed with "  " or "* " — this leading whitespace is load-bearing:
-// the shell wrapper evals any stdout line starting with "export"/"unset", so rows must
-// never start with those words even if a profile name contains them.
-func printProfileTable(w io.Writer, profiles []awscfg.Profile, current string) {
+// shell wrappers interpret allowlisted operations at the start of stdout lines, so rows
+// must never start with those operations even if a profile name resembles one.
+func printProfileTable(w io.Writer, profiles []awscfg.Profile, current string) error {
 	maxLen := len("NAME")
 	for _, p := range profiles {
 		if len(p.Name) > maxLen {
@@ -42,7 +41,8 @@ func printProfileTable(w io.Writer, profiles []awscfg.Profile, current string) {
 		}
 	}
 
-	fmt.Fprintf(w, "  %-*s  %s\n", maxLen, "NAME", "ACCOUNT ID")
+	var output strings.Builder
+	fmt.Fprintf(&output, "  %-*s  %s\n", maxLen, "NAME", "ACCOUNT ID")
 	for _, p := range profiles {
 		marker := "  "
 		if p.Name == current {
@@ -52,8 +52,9 @@ func printProfileTable(w io.Writer, profiles []awscfg.Profile, current string) {
 		if accountID == "" {
 			accountID = "-"
 		}
-		fmt.Fprintf(w, "%s%-*s  %s\n", marker, maxLen, p.Name, accountID)
+		fmt.Fprintf(&output, "%s%-*s  %s\n", marker, maxLen, p.Name, accountID)
 	}
+	return writeOutput(w, output.String())
 }
 
 func init() {

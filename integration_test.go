@@ -3,6 +3,7 @@
 package main_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,27 +11,48 @@ import (
 	"testing"
 )
 
-func buildBinary(t *testing.T) string {
-	t.Helper()
-	bin := filepath.Join(t.TempDir(), "awsctx")
-	cmd := exec.CommandContext(t.Context(), "go", "build", "-buildvcs=false", "-o", bin, ".")
+var integrationBinary string
+
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "awsctx-integration-*")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "create integration temp directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	integrationBinary = filepath.Join(dir, "awsctx")
+	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", integrationBinary, ".")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		t.Fatalf("build failed: %v", err)
+		fmt.Fprintf(os.Stderr, "build integration binary: %v\n", err)
+		_ = os.RemoveAll(dir)
+		os.Exit(1)
 	}
-	return bin
+
+	code := m.Run()
+	if err := os.RemoveAll(dir); err != nil && code == 0 {
+		fmt.Fprintf(os.Stderr, "remove integration temp directory: %v\n", err)
+		code = 1
+	}
+	os.Exit(code)
+}
+
+func buildBinary(t *testing.T) string {
+	t.Helper()
+	if integrationBinary == "" {
+		t.Fatal("integration binary was not built")
+	}
+	return integrationBinary
 }
 
 func writeConfig(t *testing.T, content string) string {
 	t.Helper()
-	f, err := os.CreateTemp(t.TempDir(), "aws-config-*")
-	if err != nil {
+	path := filepath.Join(t.TempDir(), "config")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	f.WriteString(content)
-	f.Close()
-	return f.Name()
+	return path
 }
 
 func TestSwitchByName(t *testing.T) {
@@ -97,6 +119,67 @@ func TestSwitchPreviousDeleted(t *testing.T) {
 	}
 	if len(out) != 0 {
 		t.Errorf("expected empty stdout, got %q", out)
+	}
+}
+
+func TestSwitchPreviousStateErrors(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[profile dev]\n")
+	tests := []struct {
+		name      string
+		setup     func(*testing.T, string)
+		wantError string
+	}{
+		{
+			name:      "missing",
+			setup:     func(*testing.T, string) {},
+			wantError: "no previous profile",
+		},
+		{
+			name: "empty",
+			setup: func(t *testing.T, stateDir string) {
+				t.Helper()
+				if err := os.WriteFile(filepath.Join(stateDir, "previous"), []byte(" \n\t"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantError: "previous profile state is empty",
+		},
+		{
+			name: "unreadable",
+			setup: func(t *testing.T, stateDir string) {
+				t.Helper()
+				if err := os.Mkdir(filepath.Join(stateDir, "previous"), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stateDir := t.TempDir()
+			tt.setup(t, stateDir)
+			cmd := exec.CommandContext(t.Context(), bin, "-")
+			cmd.Env = append(os.Environ(),
+				"AWS_CONFIG_FILE="+cfg,
+				"AWSCTX_STATE_DIR="+stateDir,
+			)
+			var stdout, stderr strings.Builder
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+
+			err := cmd.Run()
+			if err == nil {
+				t.Fatal("previous-profile state error succeeded, want error")
+			}
+			if stdout.Len() != 0 {
+				t.Errorf("stdout = %q, want empty", stdout.String())
+			}
+			if tt.wantError != "" && !strings.Contains(stderr.String(), tt.wantError) {
+				t.Errorf("stderr = %q, want %q", stderr.String(), tt.wantError)
+			}
+		})
 	}
 }
 
@@ -345,5 +428,127 @@ func TestCurrent(t *testing.T) {
 	}
 	if got := strings.TrimSpace(string(out)); got != "staging" {
 		t.Errorf("expected 'staging', got %q", got)
+	}
+}
+
+func TestRejectsAmbiguousRootArguments(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[profile dev]\n[profile prod]\n")
+
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "positional and profile flag", args: []string{"dev", "--profile", "prod"}},
+		{name: "current and region", args: []string{"--current", "--region", "us-east-1"}},
+		{name: "current and unset", args: []string{"--current", "--unset"}},
+		{name: "unset and region", args: []string{"--unset", "--region", "us-east-1"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := exec.CommandContext(t.Context(), bin, tt.args...)
+			cmd.Env = append(os.Environ(),
+				"AWS_CONFIG_FILE="+cfg,
+				"AWSCTX_STATE_DIR="+t.TempDir(),
+			)
+			out, err := cmd.Output()
+			if err == nil {
+				t.Fatalf("awsctx %v succeeded, want error", tt.args)
+			}
+			if len(out) != 0 {
+				t.Errorf("stdout = %q, want empty", out)
+			}
+		})
+	}
+}
+
+func TestCompletionRejectsUnsupportedShell(t *testing.T) {
+	bin := buildBinary(t)
+	cmd := exec.CommandContext(t.Context(), bin, "completion", "powershell")
+	out, err := cmd.Output()
+	if err == nil {
+		t.Fatal("unsupported completion shell succeeded, want error")
+	}
+	if len(out) != 0 {
+		t.Errorf("stdout = %q, want empty", out)
+	}
+}
+
+func TestRegionRejectsControlCharacters(t *testing.T) {
+	bin := buildBinary(t)
+	cmd := exec.CommandContext(t.Context(), bin, "--region", "us-east-1\nunset AWS_PROFILE")
+	out, err := cmd.Output()
+	if err == nil {
+		t.Fatal("region with control characters succeeded, want error")
+	}
+	if len(out) != 0 {
+		t.Errorf("stdout = %q, want empty", out)
+	}
+}
+
+func TestFalseBooleanFlagsDoNotConflict(t *testing.T) {
+	bin := buildBinary(t)
+	for _, flag := range []string{"--current=false", "--unset=false"} {
+		t.Run(flag, func(t *testing.T) {
+			cmd := exec.CommandContext(t.Context(), bin, flag, "--region", "us-east-1")
+			out, err := cmd.Output()
+			if err != nil {
+				t.Fatalf("awsctx %s failed: %v", flag, err)
+			}
+			if got, want := strings.TrimSpace(string(out)), "export AWS_DEFAULT_REGION=us-east-1"; got != want {
+				t.Errorf("stdout = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestEmptyStringFlagsFail(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[profile dev]\n")
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "profile", args: []string{"--profile", "", "--region", "us-east-1"}},
+		{name: "region", args: []string{"--profile", "dev", "--region", ""}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := exec.CommandContext(t.Context(), bin, tt.args...)
+			cmd.Env = append(os.Environ(), "AWS_CONFIG_FILE="+cfg)
+			out, err := cmd.Output()
+			if err == nil {
+				t.Fatalf("awsctx %v succeeded, want empty-value error", tt.args)
+			}
+			if len(out) != 0 {
+				t.Errorf("stdout = %q, want empty", out)
+			}
+		})
+	}
+}
+
+func TestEmptyPositionalProfileFails(t *testing.T) {
+	bin := buildBinary(t)
+	cfg := writeConfig(t, "[profile dev]\n")
+	cmd := exec.CommandContext(t.Context(), bin, "")
+	cmd.Env = append(os.Environ(),
+		"AWS_CONFIG_FILE="+cfg,
+		"AWSCTX_STATE_DIR="+t.TempDir(),
+	)
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err == nil {
+		t.Fatal("empty positional profile succeeded, want error")
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "profile cannot be empty") {
+		t.Errorf("stderr = %q, want empty-profile error", stderr.String())
 	}
 }
