@@ -65,12 +65,17 @@ func TestSwitchByName(t *testing.T) {
 		"AWS_CONFIG_FILE="+cfg,
 		"AWSCTX_STATE_DIR="+stateDir,
 	)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("switch failed: %v", err)
 	}
 	if got := strings.TrimSpace(string(out)); got != "export AWS_PROFILE=dev" {
 		t.Errorf("expected 'export AWS_PROFILE=dev', got %q", got)
+	}
+	if got, want := stderr.String(), "Switched to profile dev\n"; got != want {
+		t.Errorf("stderr = %q, want %q", got, want)
 	}
 }
 
@@ -187,6 +192,8 @@ func TestUnset(t *testing.T) {
 	bin := buildBinary(t)
 	cmd := exec.CommandContext(t.Context(), bin, "-u")
 	cmd.Env = os.Environ()
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("unset failed: %v", err)
@@ -196,18 +203,26 @@ func TestUnset(t *testing.T) {
 	if got != want {
 		t.Errorf("expected %q, got %q", want, got)
 	}
+	if got, want := stderr.String(), "Cleared AWS profile and region\n"; got != want {
+		t.Errorf("stderr = %q, want %q", got, want)
+	}
 }
 
 func TestRegionFlag(t *testing.T) {
 	bin := buildBinary(t)
 	cmd := exec.CommandContext(t.Context(), bin, "-r", "us-east-1")
 	cmd.Env = os.Environ()
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("region flag failed: %v", err)
 	}
 	if got := strings.TrimSpace(string(out)); got != "export AWS_DEFAULT_REGION=us-east-1" {
 		t.Errorf("expected 'export AWS_DEFAULT_REGION=us-east-1', got %q", got)
+	}
+	if got, want := stderr.String(), "Switched to region us-east-1\n"; got != want {
+		t.Errorf("stderr = %q, want %q", got, want)
 	}
 }
 
@@ -221,6 +236,8 @@ func TestRegionFlagWithProfile(t *testing.T) {
 		"AWS_CONFIG_FILE="+cfg,
 		"AWSCTX_STATE_DIR="+stateDir,
 	)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("region+profile failed: %v", err)
@@ -229,6 +246,9 @@ func TestRegionFlagWithProfile(t *testing.T) {
 	want := "export AWS_PROFILE=dev\nexport AWS_DEFAULT_REGION=ap-southeast-1"
 	if got != want {
 		t.Errorf("expected %q, got %q", want, got)
+	}
+	if got, want := stderr.String(), "Switched to profile dev and region ap-southeast-1\n"; got != want {
+		t.Errorf("stderr = %q, want %q", got, want)
 	}
 }
 

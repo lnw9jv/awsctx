@@ -26,7 +26,10 @@ var rootCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		stdout := cmd.OutOrStdout()
 		if unsetFlag {
-			return writeOutput(stdout, "unset AWS_PROFILE\nunset AWS_DEFAULT_REGION\n")
+			if err := writeOutput(stdout, "unset AWS_PROFILE\nunset AWS_DEFAULT_REGION\n"); err != nil {
+				return err
+			}
+			return writeOutput(cmd.ErrOrStderr(), statusMessage("", "", true))
 		}
 		if currentFlag {
 			profile := os.Getenv("AWS_PROFILE")
@@ -47,7 +50,10 @@ var rootCmd = &cobra.Command{
 			target = prev // falls through to switchProfile, which validates it still exists
 		}
 		if target == "" && regionFlag != "" {
-			return writeOutput(stdout, fmt.Sprintf("export AWS_DEFAULT_REGION=%s\n", regionFlag))
+			if err := writeOutput(stdout, fmt.Sprintf("export AWS_DEFAULT_REGION=%s\n", regionFlag)); err != nil {
+				return err
+			}
+			return writeOutput(cmd.ErrOrStderr(), statusMessage("", regionFlag, false))
 		}
 		if target != "" {
 			profileOutput, err := profileExport(target, nil)
@@ -63,7 +69,7 @@ var rootCmd = &cobra.Command{
 				return err
 			}
 			savePreviousProfile(target, cmd.ErrOrStderr())
-			return nil
+			return writeOutput(cmd.ErrOrStderr(), statusMessage(target, regionFlag, false))
 		}
 		profiles, err := awscfg.LoadProfiles(awscfg.ConfigPath())
 		if err != nil {
@@ -86,7 +92,7 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 		savePreviousProfile(selected, cmd.ErrOrStderr())
-		return nil
+		return writeOutput(cmd.ErrOrStderr(), statusMessage(selected, regionFlag, false))
 	},
 }
 

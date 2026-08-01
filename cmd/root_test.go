@@ -56,11 +56,16 @@ func TestRootPropagatesOutputError(t *testing.T) {
 	profileFlag = ""
 
 	wantErr := errors.New("write failed")
+	var stderr bytes.Buffer
 	testCmd := &cobra.Command{}
 	testCmd.SetOut(errorWriter{err: wantErr})
+	testCmd.SetErr(&stderr)
 	err := rootCmd.RunE(testCmd, nil)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("root RunE() error = %v, want %v", err, wantErr)
+	}
+	if stderr.Len() != 0 {
+		t.Errorf("stderr = %q, want empty", stderr.String())
 	}
 }
 
@@ -86,11 +91,16 @@ func TestRootDoesNotSavePreviousWhenOutputFails(t *testing.T) {
 	profileFlag = ""
 
 	wantErr := errors.New("write failed")
+	var stderr bytes.Buffer
 	testCmd := &cobra.Command{}
 	testCmd.SetOut(errorWriter{err: wantErr})
+	testCmd.SetErr(&stderr)
 	err := rootCmd.RunE(testCmd, []string{"prod"})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("root RunE() error = %v, want %v", err, wantErr)
+	}
+	if stderr.Len() != 0 {
+		t.Errorf("stderr = %q, want empty", stderr.String())
 	}
 	if _, err := os.Stat(filepath.Join(stateDir, "previous")); !os.IsNotExist(err) {
 		t.Fatalf("previous state exists after output failure: %v", err)
