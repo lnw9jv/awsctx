@@ -32,7 +32,9 @@ func Pick(items []string, currentProfile string) (string, error) {
 		}
 	}
 
-	opts, err := fzf.ParseOptions(true, []string{"--ansi", "--no-preview"})
+	// Global fzf options can enable filtering or change selection/output semantics.
+	// Keep this picker interactive and single-select regardless of shell defaults.
+	opts, err := fzf.ParseOptions(false, []string{"--ansi", "--no-preview"})
 	if err != nil {
 		return "", fmt.Errorf("fzf: %w", err)
 	}

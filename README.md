@@ -78,7 +78,11 @@ awsctx completion fish > ~/.config/fish/completions/awsctx.fish
 
 ## Requirements
 
-- Go 1.26+ (to build)
+- Go 1.26.2+ (to build; CI uses Go 1.27.1)
 - `~/.aws/config` with `[profile <name>]` sections
 
 The fuzzy picker uses [fzf](https://github.com/junegunn/fzf), embedded as a Go library and compiled into the binary — no separate `fzf` install is required.
+
+The picker ignores `FZF_DEFAULT_OPTS` and `FZF_DEFAULT_OPTS_FILE` so global settings cannot select a profile automatically or change its output.
+
+Integration tests use Python 3's standard-library PTY support to exercise selection, cancellation, and clean stdout in a real terminal. Install Python 3 alongside bash, zsh, and fish to run all shell and picker checks with `make test-integration`.

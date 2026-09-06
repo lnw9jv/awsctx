@@ -46,6 +46,17 @@ func buildBinary(t *testing.T) string {
 	return integrationBinary
 }
 
+func TestInteractivePicker(t *testing.T) {
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not installed, skipping PTY tests")
+	}
+	cmd := exec.CommandContext(t.Context(), python, "tests/picker.py", buildBinary(t))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("interactive picker: %v\n%s", err, out)
+	}
+}
+
 func writeConfig(t *testing.T, content string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "config")
